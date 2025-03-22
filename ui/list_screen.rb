@@ -1,5 +1,4 @@
-require 'tk'
-require 'tk/ttk'
+require 'Gtk3'
 
 # ##################### #
 # 　　リスト画面のUI

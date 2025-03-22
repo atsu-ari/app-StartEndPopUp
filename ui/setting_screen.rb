@@ -1,5 +1,4 @@
-require 'tk'
-require 'tk/ttk'
+require 'Gtk3'
 
 # ##################### #
 # 　　設定画面のUI
@@ -19,7 +18,8 @@ class SettingScreen
   def create_widgets
     # 始業前起動の利用
     @before_start_var = TkVariable.new(false)
-    before_start_check = TkCheckButton.new(@setting_screen) do
+    # TkCheckButton
+    TkCheckButton.new(@setting_screen) do
       text "始業前起動を利用する"
       variable @before_start_var
       command proc { toggle_before_start }
@@ -36,10 +36,11 @@ class SettingScreen
       pack(side: 'left', padx: 5)
     end
 
+    # hour_combo
     @hour_var = TkVariable.new
-    hour_combo = TkCombobox.new(time_frame) do
+    TkCombobox.new(time_frame) do
       textvariable @hour_var
-      values (0..23).map { |i| format('%02d', i) }
+      values((0..23).map { |i| format('%02d', i) }) # 0から23までの値を2桁表示
       width 3
       pack(side: 'left', padx: 2)
     end
@@ -50,9 +51,9 @@ class SettingScreen
     end
 
     @minute_var = TkVariable.new
-    minute_combo = TkCombobox.new(time_frame) do
+    TkCombobox.new(time_frame) do
       textvariable @minute_var
-      values (0..59).map { |i| format('%02d', i) }
+      values((0..59).map { |i| format('%02d', i) })
       width 3
       pack(side: 'left', padx: 2)
     end
@@ -63,7 +64,7 @@ class SettingScreen
       pack(pady: 10)
     end
 
-    before_button = TkRadioButton.new(radio_frame) do
+    TkRadioButton.new(radio_frame) do
       text "始業前"
       variable @time_period
       value "before"
@@ -71,7 +72,7 @@ class SettingScreen
       pack(side: 'left', padx: 5)
     end
 
-    start_button = TkRadioButton.new(radio_frame) do
+    TkRadioButton.new(radio_frame) do
       text "始業時"
       variable @time_period
       value "start"
@@ -79,7 +80,7 @@ class SettingScreen
       pack(side: 'left', padx: 5)
     end
 
-    end_button = TkRadioButton.new(radio_frame) do
+    TkRadioButton.new(radio_frame) do
       text "終業時"
       variable @time_period
       value "end"
@@ -97,21 +98,21 @@ class SettingScreen
       pack(pady: 5)
     end
 
-    todo_radio = TkRadioButton.new(type_frame) do
+    TkRadioButton.new(type_frame) do
       text "Todo"
       variable @item_type
       value "todo"
       pack(side: 'left', padx: 5)
     end
 
-    url_radio = TkRadioButton.new(type_frame) do
+    TkRadioButton.new(type_frame) do
       text "URL"
       variable @item_type
       value "url"
       pack(side: 'left', padx: 5)
     end
 
-    app_radio = TkRadioButton.new(type_frame) do
+    TkRadioButton.new(type_frame) do
       text "アプリ"
       variable @item_type
       value "app"
@@ -143,7 +144,8 @@ class SettingScreen
     @text_entry.bind("FocusIn", proc { @text_entry.delete(0, 'end') })
     @text_entry.bind("Shift-Return", proc { add_item })
 
-    add_button = TkButton.new(input_frame) do
+    # add_button
+      TkButton.new(input_frame) do
       text "+"
       command proc { add_item }
       pack(pady: 5)
@@ -164,28 +166,43 @@ class SettingScreen
       pack(side: 'left', fill: 'both', expand: true)
     end
 
-    delete_button = TkButton.new(list_display_frame) do
+    # delete_button
+    TkButton.new(list_display_frame) do
       text "❌"
       command proc { delete_selected_item }
       pack(side: 'right', padx: 5)
     end
 
     # 完了ボタン
-    complete_button = TkButton.new(@setting_screen) do
+    TkButton.new(@setting_screen) do
       text "完了"
       command proc { process_setting_complete }
       pack(pady: 20)
     end
 
     # 案内画面起動ボタン
-    guide_button = TkButton.new(@setting_screen) do
+    TkButton.new(@setting_screen) do
       text "?"
       command proc { show_guide_screen }
       place(x: 10, y: 470) # 左下角に配置
     end
   end
 
+  def toggle_before_start
+    @app.toggle_before_start_launch
+  end
+
+  def update_time_selection
+    @app.update_time_selection
+  end
+
+  def add_item
+    @app.add_item
+  end
+
+  # 設定画面を削除する
   def destroy
     @setting_screen.destroy
   end
+
 end

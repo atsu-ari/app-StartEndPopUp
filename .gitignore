@@ -175,3 +175,7 @@ cython_debug/
 
 #作業用ファイルの除外
 tmp/
+
+#読み書きファイルの除外
+config.json
+tasks.csv

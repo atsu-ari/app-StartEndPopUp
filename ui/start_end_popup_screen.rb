@@ -1,6 +1,8 @@
-require 'tk'
-require 'tk/ttk'
+require 'Gtk3'
 
+# ############################# #
+# 　　Start-End PopUP！画面のUI
+# ############################# #
 class StartEndPopUpScreen
   def initialize(root, app)
     @root = root

@@ -1,8 +1,8 @@
-require 'tk'
+require 'Gtk3'
 
-=begin
-　　Loading画面のUI
-=end
+# ##################### #
+# 　　Loading画面のUI
+# ##################### #
 class LoadingScreen
   def initialize(root, app)
     @root = root
