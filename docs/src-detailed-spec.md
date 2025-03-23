@@ -118,35 +118,40 @@
 
 ## 5. その他
 
-* UIフレームワーク：PyQt
-* 開発言語：Python
-* 時刻の比較：datetimeライブラリを使用
-* 外部アプリケーションの起動：subprocessライブラリを使用
+* UIフレームワーク：Gtk3
+* 開発言語：Ruby 3.2.7
 * エラー処理：例外処理、ログ出力
 * テスト：ユニットテスト、結合テスト
-
+* 利用しているGem：
+    * **gdk3**: GTK+ 3をRubyで利用するためのライブラリ。UIの構築に使用。
+    * **csv**: CSVファイルの読み書きに使用（標準ライブラリ）。
+    * **json**: JSON形式の設定ファイルの読み書きに使用（標準ライブラリ）。
+    * **date**: 日付や時刻の操作に使用（標準ライブラリ）。
+    * **open3**: 外部コマンドの実行に使用（標準ライブラリ）。
+    * **etc**: システム情報の取得に使用（標準ライブラリ）。
+    * **uri**: URLの操作に使用（標準ライブラリ）。
 ## 6. コード構成
 
 ```
-todo_list_app/
-├── main.py
+StartEndPopUp/
+├── main.rb
 ├── ui/
-│   ├── loading_screen.py
-│   ├── guide_screen.py
-│   ├── start_end_popup_screen.py
-│   ├── list_screen.py
-│   └── setting_screen.py
-├── utils/
-│   ├── config_manager.py
-│   ├── list_manager.py
-│   └── time_utils.py
-└── tests/
-    ├── test_config_manager.py
-    ├── test_list_manager.py
-    └── test_time_utils.py
+│   ├── list_screen.rb
+│   ├── setting_screen.rb
+│   ├── start_end_popup_screen.rb
+├── lib/
+│   └── util/
+│       ├── app_utils.rb
+├── img/
+│   ├── loading.png
+│   ├── guide_image.png
+│   ├── Start-EndPopUp.png
+└── config/
+    ├── config_default.json
+    ├── config.json
+    └── tasks.csv
 ```
 
 ## 7. 補足
 
-* 詳細設計書に記載されていない部分は、提供されたTkinterのコードを参考に実装する。
 * エラー処理、テスト、ログ出力などの詳細は、実装時に決定する。
