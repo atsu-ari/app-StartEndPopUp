@@ -6,23 +6,23 @@ require 'open3'
 require 'etc'
 require 'uri'
 
-require_relative 'ui/guide_screen'
 require_relative 'ui/list_screen'
-require_relative 'ui/loading_screen'
 require_relative 'ui/setting_screen'
 require_relative 'ui/start_end_popup_screen'
+require_relative 'lib/util/app_utils'
 
 # グローバル変数を定義
-$shared_array_config = []
+$shared_array_config = {}
 $shared_array_list = []
 
 # ファイルパスを定義
 $config_default_path = 'config_default.json'
 $config_file_path = 'config.json'
 $list_file_path = 'tasks.csv'
-$loading_img_path = '../img/loading.png'
-$guide_img_path = '../img/guide_image.png'
-$StartEndPopup_img_path = '../img/Start-EndPopUp.png'
+$loading_img_path = 'img/loading.png'
+$guide_img_path = 'img/guide_image.png'
+$StartEndPopup_img_path = 'img/Start-EndPopUp.png'
+$icon_path = 'img/Start-EndPopUp.png'
 
 ################################################################################
 ################################################################################
@@ -37,6 +37,20 @@ $StartEndPopup_img_path = '../img/Start-EndPopUp.png'
 
 ################################################################################
 ################################################################################
+# このアプリケーションは、以下の機能を提供します：
+# - 始業・終業時の通知ポップアップ
+# - 設定画面でのタスクやスケジュールの管理
+# - リスト画面でのタスクの表示と編集
+# - ローディング画面や案内画面の表示
+# - ユーザー操作に応じたダイアログ表示と処理
+#
+# 主なクラスと機能：
+# - `StartEndPopUpApp`: アプリケーション全体の管理
+# - `show_guide_screen`: 案内画面の表示
+# - `show_setting_screen`: 設定画面の表示
+# - `show_list_screen`: リスト画面の表示
+# - `create_loading_screen`: ローディング画面の作成
+# - `handle_window_close`: アプリケーション終了時の処理
 
 class StartEndPopUpApp
   # 起動時処理
@@ -48,6 +62,9 @@ class StartEndPopUpApp
     # 配列を初期化
     @shared_array_config = []
     @shared_array_list = []
+
+    # Loading画面の表示
+    create_loading_screen
 
     # $config_file_path にファイルが存在しない場合、$config_default_path をコピー
     unless File.exist?($config_file_path)
@@ -63,29 +80,64 @@ class StartEndPopUpApp
       File.new($list_file_path, 'w') # 空のファイルを作成
       puts "Empty list file created at #{$list_file_path}"
     end
+
     # 起動時の処理
-    # load_config
+    $shared_array_config = Utility.load_config($config_file_path)
     # load_list
 
     # UIの作成
     @main_window = Gtk::Window.new
     @main_window.set_title('x')
-    @main_window.set_default_size(1, 1) # サイズは適宜調整
 
-    # ウィンドウが閉じられたときの処理
-    @main_window.signal_connect('destroy') { Gtk.main_quit }
+    # ウィンドウの幅と高さを定義
+    window_width = 120  # ウィンドウの幅
+    window_height = 100 # ウィンドウの高さ
+
+    # ウィンドウの位置を上中央に設定
+    screen = Gdk::Screen.default
+    x_position = (screen.width - window_width) / 2 # 上中央の座標を計算
+    y_position = 0 # 上部に配置するためY座標は0
+
+    @main_window.set_default_size(window_width, window_height)
+    @main_window.move(x_position, y_position)
+
+    # アイコンを設定
+    if File.exist?($icon_path)
+      # 画像をPixbufとして読み込む
+      pixbuf = GdkPixbuf::Pixbuf.new(file: $icon_path)
+
+      # ウィンドウサイズに合わせて画像をリサイズ
+      resized_pixbuf = pixbuf.scale(window_width, window_height)
+
+      # リサイズしたPixbufをGtk::Imageに設定
+      icon_image = Gtk::Image.new(pixbuf: resized_pixbuf)
+
+      # EventBoxを作成してクリックイベントを追加
+      event_box = Gtk::EventBox.new
+      event_box.add(icon_image)
+      event_box.signal_connect('button-press-event') do |_widget, _event|
+        # ウィンドウの終了処理を呼び出す
+        handle_window_close
+      end
+
+      # EventBoxをウィンドウに追加
+      @main_window.add(event_box)
+    else
+      puts "アイコン画像が見つかりません: #{$icon_path}"
+    end
+
+    @main_window.signal_connect('destroy') do
+      handle_window_close
+    end
 
     # メインウィンドウを表示
     @main_window.show_all
 
-    # UIの作成
-    # create_loading_screen
-
-    # # 2秒後に案内画面を表示
-    # GLib::Timeout.add(2000) do
-    #   show_guide_screen
-    #   false # タイマーを1回だけ実行
-    # end
+    # 2秒後に案内画面を表示
+    GLib::Timeout.add(1000) do
+      show_guide_screen
+      false # タイマーを1回だけ実行
+    end
   end
 
   # Loading画面を作成する
@@ -94,10 +146,21 @@ class StartEndPopUpApp
     @loading_screen.set_title('Loading')
     @loading_screen.set_default_size(610, 610) # サイズは適宜調整
     @loading_screen.set_keep_above(true) # 最前面に表示
+    @loading_screen.set_window_position(:center) # ウィンドウを中央に表示
+
+    # 終了ボタンを無効化
+    @loading_screen.signal_connect('delete-event') { true }
 
     # 画像の表示 (画像ファイルが存在する場合)
     if File.exist?($loading_img_path)
-      guide_image = Gtk::Image.new(file: $loading_img_path)
+      # 画像をPixbufとして読み込む
+      pixbuf = GdkPixbuf::Pixbuf.new(file: $loading_img_path)
+
+      # ウィンドウサイズに合わせて画像をリサイズ
+      resized_pixbuf = pixbuf.scale(610, 610)
+
+      # リサイズしたPixbufをGtk::Imageに設定
+      guide_image = Gtk::Image.new(pixbuf: resized_pixbuf)
       @loading_screen.add(guide_image)
     else
       # 画像がない場合はテキストを表示
@@ -116,23 +179,39 @@ class StartEndPopUpApp
     @guide_screen.set_title('どんなアプリ？')
     @guide_screen.set_default_size(710, 620)
     @guide_screen.set_window_position(:center)
+    @guide_screen.set_keep_above(true) # 最前面に表示
+
+    # 終了ボタンを無効化
+    @guide_screen.signal_connect('delete-event') { true }
 
     # 案内画像の表示 (画像ファイルが存在する場合)
+    guide_image = nil
     if File.exist?($guide_img_path)
-      guide_image = Gtk::Image.new(file: $guide_img_path)
-      @guide_screen.add(guide_image)
+      # 画像をPixbufとして読み込む
+      pixbuf = GdkPixbuf::Pixbuf.new(file: $guide_img_path)
+
+      # ウィンドウサイズに合わせて画像をリサイズ
+      resized_pixbuf = pixbuf.scale(710, 620)
+
+      # リサイズしたPixbufをGtk::Imageに設定
+      guide_image = Gtk::Image.new(pixbuf: resized_pixbuf)
     else
       # 画像がない場合はテキストを表示
-      label = Gtk::Label.new('案内画面へようこそ！')
-      @guide_screen.add(label)
+      guide_image = Gtk::Label.new('案内画面へようこそ！')
     end
 
-    # OKボタンの追加
+    # OKボタンを追加
     ok_button = Gtk::Button.new(label: 'OK')
-    ok_button.signal_connect('clicked') { process_guide_ok }
-    vbox = Gtk::Box.new(:vertical, 10)
+    ok_button.signal_connect('clicked') do
+      process_guide_ok # OKボタンがクリックされたときに呼び出す
+    end
+
+    # レイアウトを設定
+    vbox = Gtk::Box.new(:vertical, 10) # 垂直方向のボックス
+    vbox.pack_start(guide_image, expand: true, fill: true, padding: 10) if guide_image
     vbox.pack_start(ok_button, expand: false, fill: false, padding: 10)
-    @guide_screen.add(vbox)
+
+    @guide_screen.add(vbox) # Gtk::Box をウィンドウに追加
 
     @guide_screen.show_all
   end
@@ -145,27 +224,25 @@ class StartEndPopUpApp
 
   # Start-End Pop Up!画面を表示する
   def show_start_end_popup_screen
-    @start_end_popup_screen = Gtk::Window.new(@root)
-    @start_end_popup_screen.title('Start-End Pop Up!')
-    @start_end_popup_screen.geometry('610x610') # サイズは適宜調整
+    @start_end_popup_screen = Gtk::Window.new
+    @start_end_popup_screen.set_title('Start-End Pop Up!')
+    @start_end_popup_screen.set_default_size(610, 610)
+    @start_end_popup_screen.set_window_position(:center)
 
-    # 案内画像の表示 (画像ファイルが存在する場合)
+    # 終了ボタンを無効化
+    @start_end_popup_screen.signal_connect('delete-event') { true }
+
     if File.exist?($StartEndPopup_img_path)
-      top_image = Gtk::Image.new(file: $StartEndPopup_img_path)
-      @guide_screen.add(top_image)
+      pixbuf = GdkPixbuf::Pixbuf.new(file: $StartEndPopup_img_path)
+      resized_pixbuf = pixbuf.scale(610, 610)
+      top_image = Gtk::Image.new(pixbuf: resized_pixbuf)
+      @start_end_popup_screen.add(top_image)
     else
-      # 画像がない場合はテキストを表示
       label = Gtk::Label.new('案内画面へようこそ！')
-      @guide_screen.add(label)
+      @start_end_popup_screen.add(label)
     end
 
-    @start_end_popup_screen.attributes('-topmost', 1) # 最前面に表示
-
-    settings_button = Gtk::Button.new(@start_end_popup_screen, text: '⚙', command: proc { show_setting_screen })
-    settings_button.pack(side: 'left', padx: 10, pady: 20)
-
-    ok_button = Gtk::Button.new(@start_end_popup_screen, text: 'OK', command: proc { @start_end_popup_screen.destroy })
-    ok_button.pack(side: 'right', padx: 10, pady: 20)
+    @start_end_popup_screen.show_all
   end
 
   # リスト画面を表示する
@@ -245,12 +322,14 @@ class StartEndPopUpApp
 
   # 設定画面を表示する
   def show_setting_screen
-    @setting_screen = Gtk::Window.new(@root)
-    @setting_screen.title('設定')
-    @setting_screen.geometry('600x500') # サイズは適宜調整
+    @setting_screen = Gtk::Window.new
+    @setting_screen.set_title('設定')
+    @setting_screen.set_default_size(600, 500)
 
-    create_setting_ui
-    load_setting_data
+    # 終了ボタンを無効化
+    @setting_screen.signal_connect('delete-event') { true }
+
+    SettingScreen.new(self)
   end
 
   # 始業前起動の利用チェックボックスの状態変更時の処理
@@ -262,7 +341,7 @@ class StartEndPopUpApp
     end
   end
 
-  # 始業前、始業時、終業時の選択項目クリック時の処理
+  # 始業前、始業時、終業時の選択項目クリック時の処理【後日実装】
   def update_time_selection
     config = load_config
     selected_time_period = @time_period.value
@@ -336,7 +415,35 @@ class StartEndPopUpApp
 
   # 半角記号と空白を全角に変換する
   def convert_to_zenkaku(str)
-    str.tr('a-zA-Z0-9 ', 'ａ-ｚＡ-Ｚ０-９　')
+    str.tr(' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~', '　！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～')
+  end
+
+  def handle_window_close
+    dialog = Gtk::MessageDialog.new(
+      parent: @main_window,
+      flags: :destroy_with_parent,
+      type: :question,
+      buttons: :ok_cancel,
+      message: 'Start-End Pop Up!を終了しますか？'
+    )
+
+    dialog.set_window_position(:center) # ダイアログを画面中央に表示
+
+    response = dialog.run
+    dialog.destroy
+
+    return unless response == :ok
+
+    # ファイルを削除（必要に応じてコメントアウト）
+    begin
+      File.delete($list_file_path) if File.exist?($list_file_path)
+      File.delete($config_file_path) if File.exist?($config_file_path)
+      puts "Deleted #{$list_file_path} and #{$config_file_path}"
+    rescue StandardError => e
+      puts "Error deleting files: #{e.message}"
+    end
+
+    Gtk.main_quit # アプリケーションを終了
   end
 end
 

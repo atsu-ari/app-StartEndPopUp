@@ -1,208 +1,217 @@
-require 'Gtk3'
+require 'gtk3'
 
 # ##################### #
 # 　　設定画面のUI
 # ##################### #
+# このクラスは設定画面を構築し、以下の機能を提供します：
+# - 始業前起動や時刻設定のチェックボックスとラジオボタン
+# - 項目の追加（URL、アプリ、Todo）とリスト表示
+# - リストの各項目に対するチェックボックスのオン・オフ切り替え
+# - デモ画面（リスト画面）の起動
+# - 設定内容の保存と完了ボタン
 class SettingScreen
-  def initialize(root, app)
-    @root = root
+  def initialize(app)
     @app = app
-    @setting_screen = TkToplevel.new(@root)
-    @setting_screen.title('設定')
-    @setting_screen.geometry('600x500')
+    @setting_screen = Gtk::Window.new
+    @setting_screen.set_title('設定')
+    @setting_screen.set_default_size(600, 500)
+    @setting_screen.set_window_position(:center)
 
     create_widgets
-    @app.load_setting_data
+    @setting_screen.show_all
   end
 
   def create_widgets
+    # メインコンテナ
+    vbox = Gtk::Box.new(:vertical, 10)
+    vbox.margin = 10
+    @setting_screen.add(vbox)
+
     # 始業前起動の利用
-    @before_start_var = TkVariable.new(false)
-    # TkCheckButton
-    TkCheckButton.new(@setting_screen) do
-      text "始業前起動を利用する"
-      variable @before_start_var
-      command proc { toggle_before_start }
-      pack(pady: 5)
-    end
+    before_start_checkbox = Gtk::CheckButton.new('始業前起動を利用する')
+    before_start_checkbox.sensitive = false # チェックボックスを無効化【次回実装予定】
+    before_start_checkbox.signal_connect('toggled') { toggle_before_start }
+    vbox.pack_start(before_start_checkbox, expand: false, fill: false, padding: 5)
 
     # 時刻の選択
-    time_frame = TkFrame.new(@setting_screen) do
-      pack(pady: 10)
-    end
+    time_frame = Gtk::Box.new(:horizontal, 5)
+    vbox.pack_start(time_frame, expand: false, fill: false, padding: 5)
 
-    TkLabel.new(time_frame) do
-      text "時刻:"
-      pack(side: 'left', padx: 5)
-    end
+    time_label = Gtk::Label.new('時刻:')
+    time_frame.pack_start(time_label, expand: false, fill: false, padding: 5)
 
-    # hour_combo
-    @hour_var = TkVariable.new
-    TkCombobox.new(time_frame) do
-      textvariable @hour_var
-      values((0..23).map { |i| format('%02d', i) }) # 0から23までの値を2桁表示
-      width 3
-      pack(side: 'left', padx: 2)
-    end
+    @hour_combo = Gtk::ComboBoxText.new
+    (0..23).each { |i| @hour_combo.append_text(format('%02d', i)) }
+    time_frame.pack_start(@hour_combo, expand: false, fill: false, padding: 5)
 
-    TkLabel.new(time_frame) do
-      text ":"
-      pack(side: 'left')
-    end
+    colon_label = Gtk::Label.new(':')
+    time_frame.pack_start(colon_label, expand: false, fill: false, padding: 0)
 
-    @minute_var = TkVariable.new
-    TkCombobox.new(time_frame) do
-      textvariable @minute_var
-      values((0..59).map { |i| format('%02d', i) })
-      width 3
-      pack(side: 'left', padx: 2)
-    end
+    @minute_combo = Gtk::ComboBoxText.new
+    (0..59).each { |i| @minute_combo.append_text(format('%02d', i)) }
+    time_frame.pack_start(@minute_combo, expand: false, fill: false, padding: 5)
 
     # 選択項目 (ラジオボタン)
-    @time_period = TkVariable.new("start") # 初期値は始業時
-    radio_frame = TkFrame.new(@setting_screen) do
-      pack(pady: 10)
-    end
+    radio_frame = Gtk::Box.new(:horizontal, 5)
+    vbox.pack_start(radio_frame, expand: false, fill: false, padding: 5)
 
-    TkRadioButton.new(radio_frame) do
-      text "始業前"
-      variable @time_period
-      value "before"
-      command proc { update_time_selection }
-      pack(side: 'left', padx: 5)
-    end
+    @time_period = Gtk::RadioButton.new(label: '始業前')
+    @time_period.sensitive = false # 始業前ボタンを無効化
+    @time_period.signal_connect('toggled') { update_time_selection }
+    radio_frame.pack_start(@time_period, expand: false, fill: false, padding: 5)
 
-    TkRadioButton.new(radio_frame) do
-      text "始業時"
-      variable @time_period
-      value "start"
-      command proc { update_time_selection }
-      pack(side: 'left', padx: 5)
-    end
+    @start_radio = Gtk::RadioButton.new(member: @time_period, label: '始業時')
+    @start_radio.signal_connect('toggled') { update_time_selection }
+    radio_frame.pack_start(@start_radio, expand: false, fill: false, padding: 5)
 
-    TkRadioButton.new(radio_frame) do
-      text "終業時"
-      variable @time_period
-      value "end"
-      command proc { update_time_selection }
-      pack(side: 'left', padx: 5)
-    end
+    @end_radio = Gtk::RadioButton.new(member: @time_period, label: '終業時')
+    @end_radio.sensitive = false # 終業時ボタンを無効化
+    @end_radio.signal_connect('toggled') { update_time_selection }
+    radio_frame.pack_start(@end_radio, expand: false, fill: false, padding: 5)
+
+    # デフォルトで「始業時」を選択
+    @start_radio.active = true
 
     # 入力欄
-    input_frame = TkFrame.new(@setting_screen) do
-      pack(pady: 10)
-    end
+    input_frame = Gtk::Box.new(:vertical, 5)
+    vbox.pack_start(input_frame, expand: false, fill: false, padding: 5)
 
-    @item_type = TkVariable.new("todo") # 初期値はTodo
-    type_frame = TkFrame.new(input_frame) do
-      pack(pady: 5)
-    end
+    # 項目名入力とラベルを水平に並べる
+    name_and_label_frame = Gtk::Box.new(:horizontal, 5)
+    input_frame.pack_start(name_and_label_frame, expand: false, fill: false, padding: 2)
 
-    TkRadioButton.new(type_frame) do
-      text "Todo"
-      variable @item_type
-      value "todo"
-      pack(side: 'left', padx: 5)
-    end
+    # ドロップダウンボックス（選択内容: URL、アプリ、Todo）
+    @item_type = Gtk::ComboBoxText.new
+    @item_type.set_size_request(50, -1) # 幅を50、高さはデフォルト
+    @item_type.append_text('URL')
+    @item_type.append_text('アプリ')
+    @item_type.append_text('Todo')
+    @item_type.active = 2 # デフォルトで「Todo」を選択
+    name_and_label_frame.pack_start(@item_type, expand: false, fill: false, padding: 2)
 
-    TkRadioButton.new(type_frame) do
-      text "URL"
-      variable @item_type
-      value "url"
-      pack(side: 'left', padx: 5)
-    end
+    # 項目名入力欄
+    @name_entry = Gtk::Entry.new
+    @name_entry.set_placeholder_text('タイトルまたは概要')
+    name_and_label_frame.pack_start(@name_entry, expand: true, fill: true, padding: 2)
 
-    TkRadioButton.new(type_frame) do
-      text "アプリ"
-      variable @item_type
-      value "app"
-      pack(side: 'left', padx: 5)
-    end
+    # テキスト入力とボタンを水平に並べる
+    text_and_label_frame = Gtk::Box.new(:horizontal, 5)
+    input_frame.pack_start(text_and_label_frame, expand: false, fill: false, padding: 2)
 
-    TkLabel.new(input_frame) do
-      text "項目名:"
-      pack(pady: 2)
-    end
+    @text_entry = Gtk::Entry.new
+    @text_entry.set_placeholder_text('内容（任意）')
+    text_and_label_frame.pack_start(@text_entry, expand: true, fill: true, padding: 2)
 
-    @name_entry = TkEntry.new(input_frame) do
-      width 40
-      pack(pady: 2)
-    end
-    @name_entry.insert(0, "タイトルまたは概要")
-    @name_entry.bind("FocusIn", proc { @name_entry.delete(0, 'end') })
-
-    TkLabel.new(input_frame) do
-      text "テキスト:"
-      pack(pady: 2)
-    end
-
-    @text_entry = TkEntry.new(input_frame) do
-      width 40
-      pack(pady: 2)
-    end
-    @text_entry.insert(0, "内容（任意）")
-    @text_entry.bind("FocusIn", proc { @text_entry.delete(0, 'end') })
-    @text_entry.bind("Shift-Return", proc { add_item })
-
-    # add_button
-      TkButton.new(input_frame) do
-      text "+"
-      command proc { add_item }
-      pack(pady: 5)
-    end
+    add_button = Gtk::Button.new(label: '+')
+    add_button.set_size_request(30, -1) # 幅を30、高さはデフォルト
+    add_button.signal_connect('clicked') { add_item }
+    text_and_label_frame.pack_start(add_button, expand: false, fill: false, padding: 2)
 
     # リスト表示
-    list_display_frame = TkFrame.new(@setting_screen) do
-      pack(pady: 10, padx: 10, fill: 'both', expand: true)
-    end
+    list_display_frame = Gtk::ScrolledWindow.new
+    list_display_frame.set_policy(:automatic, :automatic)
+    vbox.pack_start(list_display_frame, expand: true, fill: true, padding: 5)
 
-    # リスト表示用のTreeview
-    @setting_tree = TkTreeview.new(list_display_frame) do
-      columns ["type", "name", "text"]
-      show "headings"
-      heading("type", text: "種別")
-      heading("name", text: "名前")
-      heading("text", text: "テキスト")
-      pack(side: 'left', fill: 'both', expand: true)
-    end
+    # TreeViewのデータモデルを設定（4列: Topic, ☑, 項目名, 内容）
+    list_store = Gtk::ListStore.new(String, TrueClass, String, String)
+    @setting_tree = Gtk::TreeView.new(list_store)
+    list_display_frame.add(@setting_tree)
 
-    # delete_button
-    TkButton.new(list_display_frame) do
-      text "❌"
-      command proc { delete_selected_item }
-      pack(side: 'right', padx: 5)
-    end
+    # カラムを追加
 
-    # 完了ボタン
-    TkButton.new(@setting_screen) do
-      text "完了"
-      command proc { process_setting_complete }
-      pack(pady: 20)
-    end
+    # Topic カラム
+    topic_renderer = Gtk::CellRendererText.new
+    topic_column = Gtk::TreeViewColumn.new('Topic', topic_renderer, text: 0)
+    @setting_tree.append_column(topic_column)
 
-    # 案内画面起動ボタン
-    TkButton.new(@setting_screen) do
-      text "?"
-      command proc { show_guide_screen }
-      place(x: 10, y: 470) # 左下角に配置
+    # ☑ カラム（チェックボックス）
+    checkbox_renderer = Gtk::CellRendererToggle.new
+    checkbox_renderer.activatable = true
+    checkbox_renderer.signal_connect('toggled') do |_, path|
+      iter = list_store.get_iter(path)
+      iter[1] = !iter[1] # チェック状態をトグル
     end
+    checkbox_column = Gtk::TreeViewColumn.new('☑', checkbox_renderer, active: 1)
+    @setting_tree.append_column(checkbox_column)
+
+    # 項目名 カラム
+    name_renderer = Gtk::CellRendererText.new
+    name_column = Gtk::TreeViewColumn.new('項目名', name_renderer, text: 2)
+    @setting_tree.append_column(name_column)
+
+    # 内容 カラム
+    content_renderer = Gtk::CellRendererText.new
+    content_column = Gtk::TreeViewColumn.new('内容', content_renderer, text: 3)
+    @setting_tree.append_column(content_column)
+
+    # TreeViewのモデルを設定
+    @setting_tree.model = list_store
+
+    # ボタンを水平に並べるためのコンテナ
+    button_box = Gtk::Box.new(:horizontal, 10)
+    vbox.pack_start(button_box, expand: false, fill: false, padding: 10)
+
+    # デモボタン（左側）
+    demo_button = Gtk::Button.new(label: 'デモのリスト画面を見る')
+    demo_button.set_size_request(400, -1) # 幅を400、高さはデフォルト
+    demo_button.signal_connect('clicked') do
+      @setting_screen.destroy # 設定画面を閉じる
+      @list_screen = ListScreen.new(self) # リスト画面を起動
+    end
+    button_box.pack_start(demo_button, expand: true, fill: true, padding: 5)
+
+    # 完了ボタン（右側）
+    complete_button = Gtk::Button.new(label: '完了')
+    complete_button.set_size_request(200, -1) # 幅を200、高さはデフォルト
+    complete_button.signal_connect('clicked') { process_setting_complete }
+    button_box.pack_end(complete_button, expand: false, fill: false, padding: 5)
   end
 
   def toggle_before_start
-    @app.toggle_before_start_launch
+    if @before_start_checkbox.active?
+      puts '始業前起動が有効になりました'
+    else
+      puts '始業前起動が無効になりました'
+    end
   end
 
   def update_time_selection
-    @app.update_time_selection
+    if @time_period.active?
+      puts '始業前が選択されました'
+    elsif @start_radio.active?
+      puts '始業時が選択されました'
+    elsif @end_radio.active?
+      puts '終業時が選択されました'
+    end
   end
 
   def add_item
-    @app.add_item
+    # 入力値を取得
+    item_type = @item_type.active_text || 'Todo' # ドロップダウンの選択値
+    name = @name_entry.text.strip                # 項目名入力欄の値
+    content = @text_entry.text.strip # 内容入力欄の値
+
+    # 入力値が空の場合は何もしない
+    return if name.empty?
+
+    # データモデルに追加
+    list_store = @setting_tree.model
+    iter = list_store.append
+    iter[0] = item_type # Topic カラムに @item_type の値を設定
+    iter[1] = false     # ☑ カラム（初期値: 未チェック）
+    iter[2] = name      # 項目名 カラムに @name_entry の値を設定
+    iter[3] = content   # 内容 カラムに @text_entry の値を設定
+
+    # 入力欄をクリア
+    @name_entry.text = ''
+    @text_entry.text = ''
   end
 
-  # 設定画面を削除する
-  def destroy
+  def process_setting_complete
+    # 設定内容を保存
+    puts '設定内容を保存しました'
+
+    # 設定画面を閉じる
     @setting_screen.destroy
   end
-
 end
