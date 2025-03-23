@@ -101,7 +101,10 @@ class ListScreen
     end
 
     # Perfect! チェックボックス
-    @perfect_var = Gtk::CheckButton.new('Perfect！') # 修正済み
+    @perfect_var = Gtk::CheckButton.new('Perfect！')
+    @perfect_var.signal_connect('toggled') do
+      show_dialog('オンにするとTodoがすべて☑されていなくても完了できます（未実装）') if @perfect_var.active? # チェックがオンの場合
+    end
     vbox.pack_start(@perfect_var, expand: false, fill: false, padding: 5)
 
     # ボタンのコンテナ
@@ -111,15 +114,17 @@ class ListScreen
     # 設定ボタン
     settings_button = Gtk::Button.new(label: '⚙')
     settings_button.set_size_request(30, -1) # 幅を30、高さはデフォルト
+    settings_button.signal_connect('clicked') do
+      show_dialog('設定画面を表示します')
+    end
     button_box.pack_start(settings_button, expand: true, fill: true, padding: 5)
 
     # OKボタン
     ok_button = Gtk::Button.new(label: 'OK')
+    ok_button.signal_connect('clicked') do
+      @list_screen.destroy # ウィンドウを閉じる
+    end
     button_box.pack_start(ok_button, expand: true, fill: true, padding: 5)
-
-    # 設定ボタン
-    settings_button = Gtk::Button.new(label: '⚙')
-    button_box.pack_start(settings_button, expand: true, fill: true, padding: 5)
   end
 
   # リストにアイテムを追加する

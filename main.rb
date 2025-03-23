@@ -191,7 +191,7 @@ class StartEndPopUpApp
       pixbuf = GdkPixbuf::Pixbuf.new(file: $guide_img_path)
 
       # ウィンドウサイズに合わせて画像をリサイズ
-      resized_pixbuf = pixbuf.scale(710, 620)
+      resized_pixbuf = pixbuf.scale(620, 500)
 
       # リサイズしたPixbufをGtk::Imageに設定
       guide_image = Gtk::Image.new(pixbuf: resized_pixbuf)
@@ -199,6 +199,10 @@ class StartEndPopUpApp
       # 画像がない場合はテキストを表示
       guide_image = Gtk::Label.new('案内画面へようこそ！')
     end
+
+    # ラベルを追加
+    demo_label = Gtk::Label.new('*******このプログラムは画面表示のみのデモです*******')
+    demo_label.set_margin_top(10) # 上部に余白を追加
 
     # OKボタンを追加
     ok_button = Gtk::Button.new(label: 'OK')
@@ -209,6 +213,7 @@ class StartEndPopUpApp
     # レイアウトを設定
     vbox = Gtk::Box.new(:vertical, 10) # 垂直方向のボックス
     vbox.pack_start(guide_image, expand: true, fill: true, padding: 10) if guide_image
+    vbox.pack_start(demo_label, expand: false, fill: false, padding: 10) # ラベルを追加
     vbox.pack_start(ok_button, expand: false, fill: false, padding: 10)
 
     @guide_screen.add(vbox) # Gtk::Box をウィンドウに追加
